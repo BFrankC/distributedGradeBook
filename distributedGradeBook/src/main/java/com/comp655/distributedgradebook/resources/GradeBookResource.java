@@ -2,6 +2,7 @@ package com.comp655.distributedgradebook.resources;
 
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookList;
+import com.comp655.distributedgradebook.GradebookMap;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -11,6 +12,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
@@ -20,6 +22,8 @@ import java.io.OutputStream;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  *
@@ -28,36 +32,18 @@ import java.util.logging.Logger;
 @Path("gradebook")
 public class GradeBookResource {
     
-    private GradebookList<Gradebook> gradebookList = new GradebookList<>(); // This server's list of gradebooks.
-    
+    private GradebookMap<UUID, Gradebook> gradebookMap = new GradebookMap<>();
     
     @GET
     @Produces("application/xml")
     public StreamingOutput getAllStudents() throws JAXBException {        
         // set up marshaller.
-        JAXBContext jc = JAXBContext.newInstance( GradebookList.class, Gradebook.class );
+        JAXBContext jc = JAXBContext.newInstance( GradebookMap.class, Gradebook.class );
         Marshaller m = jc.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-        
-        
-        // - - - - - - -  E X A M P L E     C O D E 
-        // - - - - - - - TO BE REMOVED BY BACK END IMPLEMENTER - - - - - - - - - -
-//        GradebookList<Gradebook> gradebookList = new GradebookList<>();
-        Gradebook testOne = new Gradebook("Alpha");
-        testOne.addStudent("name", "A");
-        gradebookList.add(testOne);
-        
-        
-        Gradebook testTwo = new Gradebook("Bravo");
-        testOne.addStudent("name", "A");
-        gradebookList.add(testTwo);
-        // - - - - - - - - E N D    E X A M P L E      C O D E
-        
-        
-        
         return (OutputStream outputStream) -> {
             try {
-                m.marshal(gradebookList, outputStream);
+                m.marshal(gradebookMap, outputStream);
             } catch (JAXBException ex) {
                 Logger.getLogger(GradebookList.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -67,51 +53,54 @@ public class GradeBookResource {
     @PUT
     @Path("{name}")   
     public Response putCreatePrimaryGradebook(@PathParam("name") String name) {
-        gradebookList.add(new Gradebook(name));
-        // We should probably do some checking here to see if we are adding duplicates or something.  
-        // Could also make gradebookList a map or something to keep duplicates from happening.  
+        Gradebook newBook = new Gradebook(name);
+        // TODO: is this needed?  probably not
+        if (gradebookMap.put(newBook.getID(), newBook) == null) {
+            return Response
+                    .ok("Added new primary gradebook " + 
+                            name + 
+                            " | id: " + 
+                            newBook.getID())
+                    .build();
+        } 
         return Response
-                .ok("Added " + name + " to gradebook")
+                // a gradebook with this UUID already existed
+                // but it shouldn't have
+                .status(Status.CONFLICT)
                 .build();
-        
-        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
     }
     
     @POST
     @Path("{name}")   
     public Response postCreatePrimaryGradebook(@PathParam("name") String name) {
-        gradebookList.add(new Gradebook(name));
-        // We should probably do some checking here to see if we are adding duplicates or something.  
-        // Could also make gradebookList a map or something to keep duplicates from happening.  
+        Gradebook newBook = new Gradebook(name);
+        if (gradebookMap.put(newBook.getID(), newBook) == null) {
+            return Response
+                    .ok("Added new primary gradebook " + 
+                            name + 
+                            " | id: " + 
+                            newBook.getID())
+                    .build();
+        } 
         return Response
-        .ok("Added " + name + " to gradebook")
-        .build();
-        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+                .status(Status.CONFLICT)
+                .build();
     }
     
     @DELETE
     @Path("{id}")   
     public Response deleteGradebookByID(@PathParam("id") String id) {
-        // This will be slow.
-        String title;
-        for(Gradebook book : gradebookList)
-        {
-            if (book.getID().equals(UUID.fromString(id)))
-            {
-                title = book.getTitle();
-                gradebookList.remove(book);
-                return Response
-                    .ok("Removed gradebook: " + title)
+        Gradebook removed = gradebookMap.remove(UUID.fromString(id));
+        if (removed != null) {
+            // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
+            // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+            return Response
+                    .ok("Deleted gradebook " + removed.getTitle())
                     .build();
-            }
         }
         return Response
-        .ok("No Gradebook Found")
-        .build();
-        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+                .status(Status.NOT_FOUND)
+                .build();
     }
     
     @GET
@@ -124,37 +113,115 @@ public class GradeBookResource {
         Marshaller m = jc.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         
-        //This should be a function.
-        for(Gradebook book : gradebookList)
-        {
-            if (book.getID().equals(UUID.fromString(id)))
-            {
-                
-                return (OutputStream outputStream) -> {
-                    try {
-                        m.marshal(book.getStudents(), outputStream);
-                    } catch (JAXBException ex) {
-                        Logger.getLogger(GradebookList.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                };
-            }
+        if (gradebookMap.containsKey(UUID.fromString(id))) {
+            return (OutputStream outputStream) -> {
+                try {
+                    m.marshal(gradebookMap.get(UUID.fromString(id)).getStudents(), outputStream);
+                } catch (JAXBException ex) {
+                    Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            };
         }
         
         return (OutputStream outputStream) -> {
             try {
                 m.marshal("", outputStream);
             } catch (JAXBException ex) {
-                Logger.getLogger(GradebookList.class.getName()).log(Level.SEVERE, null, ex);
+                Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
             }
         };
-        
     }
     
+    @GET
+    @Path("{id}/student/{name}")
+    @Produces("application/xml")
+    public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
+        if (this.gradebookMap.containsKey(UUID.fromString(name))) {
+            // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
+            // Check if student exists in gradebook {id}, build response
+        }
+        return Response
+                .status(Status.NOT_IMPLEMENTED)
+                .build();
+    }
     
-//    @GET
-//    public Response ping(){
-//        return Response
-//                .ok("no data")
-//                .build();
-//    }
+    @DELETE
+    @Path("{id}/student/{name}")
+    @Produces("application/xml")
+    public Response deleteStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
+        if (this.gradebookMap.containsKey(UUID.fromString(name))) {
+            this.gradebookMap.remove(UUID.fromString(name));
+            // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
+            // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+            return Response
+                    .ok()
+                    .build();
+        }
+        return Response
+                .status(Status.NOT_FOUND)
+                .build();
+    }
+    
+    @PUT
+    @Path("{id}/student/{name}/grade/{grade}")
+    @Produces("application/xm/")
+    public Response addStudentToGradebook(@PathParam("id") String id, 
+                                          @PathParam("name") String name,
+                                          @PathParam("grade") String grade
+                                        ) {
+        if (!this.gradebookMap.containsKey(UUID.fromString(id))) {
+            return Response
+                    .status(Status.NOT_FOUND)
+                    .build();
+        }
+        if (!isValidGrade(grade)) {
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .build();
+        }
+        this.gradebookMap.get(UUID.fromString(id)).addStudent(name, grade);
+
+        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
+        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+        return Response
+                .ok()
+                .build();
+    }
+    
+    @POST
+    @Path("{id}/student/{name}/grade/{grade}")
+    @Produces("application/xml")
+    public Response updateStudentInGradebook(@PathParam("id") String id, 
+                                             @PathParam("name") String name,
+                                             @PathParam("grade") String grade
+                                        ) {
+        if (!this.gradebookMap.containsKey(UUID.fromString(id))) {
+            return Response
+                    .status(Status.NOT_FOUND)
+                    .build();
+        }
+        if (!isValidGrade(grade)) {
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .build();
+        }
+        this.gradebookMap.get(UUID.fromString(id)).addStudent(name, grade);
+
+        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
+        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+        return Response
+                .ok()
+                .build();
+    }
+    
+    /**
+     * @author Matt
+     * I tested and used this on project 1, I believe it to be correct.
+     * 
+     */
+    private boolean isValidGrade(String grade) {
+        Pattern pattern = Pattern.compile("(^)(?:[A-D][+-]?|[a-d][+-]?|[FfIiWwZz])($)");
+        Matcher match = pattern.matcher(grade);
+        return match.matches();
+    }
 }

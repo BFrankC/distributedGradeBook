@@ -63,5 +63,11 @@ public class Gradebook {
         students.put(name, name);
     }
     
+    public String getStudentGrade(String studentName) {
+        if (students.containsKey(studentName)) {
+            return students.get(studentName);
+        }
+        return "";
+    }
 
 }

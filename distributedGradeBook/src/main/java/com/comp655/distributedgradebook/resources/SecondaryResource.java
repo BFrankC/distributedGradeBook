@@ -6,6 +6,7 @@ package com.comp655.distributedgradebook.resources;
 
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookList;
+import com.comp655.distributedgradebook.GradebookMap;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -16,8 +17,9 @@ import jakarta.ws.rs.core.Response;
 import java.util.UUID;
 
 /**
- *
- * @author glass
+ * This resource provides the /app-root/secondary/ endpoints.
+ * 
+ * @author ben
  */
 
 // N O T E
@@ -25,8 +27,9 @@ import java.util.UUID;
 
 @Path("secondary")    
 public class SecondaryResource {
-     private GradebookList<Gradebook> gradebookList = new GradebookList<>(); // This server's list of gradebooks.
-     
+    private GradebookList<Gradebook> secondaryGradebookList = new GradebookList<>(); // This server's list of gradebooks.
+    private GradebookMap<UUID, Gradebook> secondaryGradebookMap = new GradebookMap<>(); // the collection of secondary gradebooks
+    
     @PUT
     @Path("{id}")   
     public Response putCreateSecondaryGradebook(@PathParam("id") String id) {
@@ -34,10 +37,10 @@ public class SecondaryResource {
         // TODO 
         // 1. lookup a gradebook on the primary server by ID.
         // 2. get a copy of that gradebook 
-        // 3. move the copy into our gradebookList
+        // 3. move the copy into our secondaryGradebookList
         
         // We should probably do some checking here to see if we are adding duplicates or something.  
-        // Could also make gradebookList a map or something to keep duplicates from happening.  
+        // Could also make secondaryGradebookList a map or something to keep duplicates from happening.  
         return Response
                 .ok("Added") // " + name + " to secondary gradebook")
                 .build();
@@ -50,10 +53,10 @@ public class SecondaryResource {
         // TODO 
         // 1. lookup a gradebook on the primary server by ID.
         // 2. get a copy of that gradebook 
-        // 3. move the copy into our gradebookList
+        // 3. move the copy into our secondaryGradebookList
         
         // We should probably do some checking here to see if we are adding duplicates or something.  
-        // Could also make gradebookList a map or something to keep duplicates from happening.  
+        // Could also make secondaryGradebookList a map or something to keep duplicates from happening.  
         return Response
                 .ok("Added") //+ name + " to gradebook")
                 .build();
@@ -61,22 +64,15 @@ public class SecondaryResource {
     
     @DELETE
     @Path("{id}")   
-    public Response putCreatePrimaryGradebook(@PathParam("id") String id) {
-        // This will be slow.
-        String title;
-        for(Gradebook book : gradebookList)
-        {
-            if (book.getID().equals(UUID.fromString(id)))
-            {
-                title = book.getTitle();
-                gradebookList.remove(book);
-                return Response
-                    .ok("Removed gradebook: " + title)
+    public Response deleteSecondaryGradebookById(@PathParam("id") String id) {
+        Gradebook removed = secondaryGradebookMap.remove(UUID.fromString(id));
+        if (removed != null) {
+            return Response
+                    .ok("Deleted gradebook " + removed.getTitle())
                     .build();
-            }
         }
         return Response
-            .ok("No Gradebook Found")
-            .build();
+                .status(Response.Status.NOT_FOUND)
+                .build();
     }
 }
