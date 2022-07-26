@@ -29,14 +29,15 @@ import java.util.regex.Pattern;
  *
  * @author 
  */
-@Path("gradebook")
+@Path("/gradebook")
 public class GradeBookResource {
     
     private GradebookMap<UUID, Gradebook> gradebookMap = new GradebookMap<>();
     
     @GET
     @Produces("application/xml")
-    public StreamingOutput getAllStudents() throws JAXBException {        
+    public StreamingOutput getAllStudents() throws JAXBException {   
+        // TODO fix: this is returning the students within the gradebooks too, not just title + ID
         // set up marshaller.
         JAXBContext jc = JAXBContext.newInstance( GradebookMap.class, Gradebook.class );
         Marshaller m = jc.createMarshaller();
@@ -54,7 +55,6 @@ public class GradeBookResource {
     @Path("{name}")   
     public Response putCreatePrimaryGradebook(@PathParam("name") String name) {
         Gradebook newBook = new Gradebook(name);
-        // TODO: is this needed?  probably not
         if (gradebookMap.put(newBook.getID(), newBook) == null) {
             return Response
                     .ok("Added new primary gradebook " + 
@@ -125,7 +125,7 @@ public class GradeBookResource {
         
         return (OutputStream outputStream) -> {
             try {
-                m.marshal("", outputStream);
+                m.marshal("gradebook not found", outputStream);
             } catch (JAXBException ex) {
                 Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
             }
@@ -136,7 +136,10 @@ public class GradeBookResource {
     @Path("{id}/student/{name}")
     @Produces("application/xml")
     public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
-        if (this.gradebookMap.containsKey(UUID.fromString(name))) {
+        if (this.gradebookMap.containsKey(UUID.fromString(id))) {
+            return Response
+                    .ok("name: " + name + " | grade: " + this.gradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
+                    .build();
             // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
             // Check if student exists in gradebook {id}, build response
         }
@@ -149,12 +152,12 @@ public class GradeBookResource {
     @Path("{id}/student/{name}")
     @Produces("application/xml")
     public Response deleteStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
-        if (this.gradebookMap.containsKey(UUID.fromString(name))) {
-            this.gradebookMap.remove(UUID.fromString(name));
+        if (this.gradebookMap.containsKey(UUID.fromString(id))) {
+            this.gradebookMap.get(UUID.fromString(id)).deleteStudent(name);
             // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
             // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
             return Response
-                    .ok()
+                    .ok("deleted student " + name)
                     .build();
         }
         return Response
@@ -164,7 +167,7 @@ public class GradeBookResource {
     
     @PUT
     @Path("{id}/student/{name}/grade/{grade}")
-    @Produces("application/xm/")
+    @Produces("application/xml")
     public Response addStudentToGradebook(@PathParam("id") String id, 
                                           @PathParam("name") String name,
                                           @PathParam("grade") String grade

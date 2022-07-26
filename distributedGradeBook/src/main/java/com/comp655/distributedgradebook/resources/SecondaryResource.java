@@ -25,7 +25,7 @@ import java.util.UUID;
 // N O T E
 // T H I S   I S  N O T  T H E  S E C O N D A R Y   S E R V E R 
 
-@Path("secondary")    
+@Path("/secondary")    
 public class SecondaryResource {
     private GradebookList<Gradebook> secondaryGradebookList = new GradebookList<>(); // This server's list of gradebooks.
     private GradebookMap<UUID, Gradebook> secondaryGradebookMap = new GradebookMap<>(); // the collection of secondary gradebooks

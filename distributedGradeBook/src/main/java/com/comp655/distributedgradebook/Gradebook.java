@@ -60,7 +60,7 @@ public class Gradebook {
    
 
     public void addStudent(String name, String grade) {
-        students.put(name, name);
+        students.put(name, grade);
     }
     
     public String getStudentGrade(String studentName) {
@@ -68,6 +68,12 @@ public class Gradebook {
             return students.get(studentName);
         }
         return "";
+    }
+    
+    public void deleteStudent(String name) {
+        if (students.containsKey(name)) {
+            students.remove(name);
+        }
     }
 
 }
