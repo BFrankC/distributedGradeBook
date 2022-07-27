@@ -9,13 +9,14 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
  * @author Matt
  */
 @XmlRootElement
-public class GradebookMap<E, V> extends HashMap<E, V> {
+public class GradebookMap<E, V> extends ConcurrentHashMap<E, V> {
     
     @XmlElement(name = "gradebook")
     public List getGradebookList() {
