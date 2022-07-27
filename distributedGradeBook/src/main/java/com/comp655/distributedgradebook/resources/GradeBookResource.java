@@ -149,16 +149,23 @@ public class GradeBookResource {
     @Path("{id}/student/{name}")
     @Produces("application/xml")
     public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
-        // TODO: this should search gradebookMap and secGradebookMap
-        if (this.gradebookMap.containsKey(UUID.fromString(id))) {
+        if (this.gradebookMap.containsKey(UUID.fromString(id)) &&
+            this.gradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+            // found student in a primary gradebook
             return Response
                     .ok("name: " + name + " | grade: " + this.gradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
                     .build();
-            // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-            // Check if student exists in gradebook {id}, build response
+        }
+        // didn't find student in primary ... look in secondary
+        if (this.secGradebookMap.containsKey(UUID.fromString(id)) &&
+            this.secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+            // found student in a primary gradebook
+            return Response
+                    .ok("name: " + name + " | grade: " + this.secGradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
+                    .build();
         }
         return Response
-                .status(Status.NOT_IMPLEMENTED)
+                .status(Status.NOT_FOUND)
                 .build();
     }
     
