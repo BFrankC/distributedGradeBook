@@ -35,8 +35,7 @@ import java.util.UUID;
 public class SecondaryResource {
     private GradebookMap<UUID, Gradebook> secondaryGradebookMap = new GradebookMap<>(); // the collection of secondary gradebooks
     @Inject
-    GradeBookResource primaryGradebook;
-    private GradebookMap<UUID, Gradebook> primaryGradebookMap = primaryGradebook.getPrimaryGradebookMap();
+    GradeBookResource priGradebookRes;
     
     public GradebookMap<UUID, Gradebook> getSecondaryGradebookMap() {
         return secondaryGradebookMap;

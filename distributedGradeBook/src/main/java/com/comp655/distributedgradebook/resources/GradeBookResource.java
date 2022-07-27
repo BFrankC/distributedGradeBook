@@ -37,8 +37,8 @@ public class GradeBookResource {
     
     private GradebookMap<UUID, Gradebook> gradebookMap = new GradebookMap<>();
     @Inject
-    SecondaryResource secRes;
-    private GradebookMap<UUID, Gradebook> secGradebookMap = secRes.getSecondaryGradebookMap();
+    SecondaryResource secGradebookRes;
+    
     
     public GradebookMap<UUID, Gradebook> getPrimaryGradebookMap() {
         return gradebookMap;
@@ -157,11 +157,12 @@ public class GradeBookResource {
                     .build();
         }
         // didn't find student in primary ... look in secondary
-        if (this.secGradebookMap.containsKey(UUID.fromString(id)) &&
-            this.secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+        GradebookMap<UUID, Gradebook> secGradebookMap = secGradebookRes.getSecondaryGradebookMap();
+        if (secGradebookMap.containsKey(UUID.fromString(id)) &&
+            secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
             // found student in a primary gradebook
             return Response
-                    .ok("name: " + name + " | grade: " + this.secGradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
+                    .ok("name: " + name + " | grade: " + secGradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
                     .build();
         }
         return Response
