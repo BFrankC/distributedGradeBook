@@ -7,6 +7,9 @@ package com.comp655.distributedgradebook.resources;
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookList;
 import com.comp655.distributedgradebook.GradebookMap;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -24,11 +27,20 @@ import java.util.UUID;
 
 // N O T E
 // T H I S   I S  N O T  T H E  S E C O N D A R Y   S E R V E R 
+// It is the resource which provides the secondary functions.
+// This Resource and GradeBookResource are on the same server.
 
-@Path("/secondary")    
+@Path("/secondary")
+@ApplicationScoped
 public class SecondaryResource {
-    private GradebookList<Gradebook> secondaryGradebookList = new GradebookList<>(); // This server's list of gradebooks.
     private GradebookMap<UUID, Gradebook> secondaryGradebookMap = new GradebookMap<>(); // the collection of secondary gradebooks
+    @Inject
+    GradeBookResource primaryGradebook;
+    private GradebookMap<UUID, Gradebook> primaryGradebookMap = primaryGradebook.getPrimaryGradebookMap();
+    
+    public GradebookMap<UUID, Gradebook> getSecondaryGradebookMap() {
+        return secondaryGradebookMap;
+    }
     
     @PUT
     @Path("{id}")   

@@ -3,6 +3,8 @@ package com.comp655.distributedgradebook.resources;
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookList;
 import com.comp655.distributedgradebook.GradebookMap;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -30,14 +32,24 @@ import java.util.regex.Pattern;
  * @author 
  */
 @Path("/gradebook")
+@ApplicationScoped
 public class GradeBookResource {
     
     private GradebookMap<UUID, Gradebook> gradebookMap = new GradebookMap<>();
+    @Inject
+    SecondaryResource secRes;
+    private GradebookMap<UUID, Gradebook> secGradebookMap = secRes.getSecondaryGradebookMap();
+    
+    public GradebookMap<UUID, Gradebook> getPrimaryGradebookMap() {
+        return gradebookMap;
+    }
     
     @GET
     @Produces("application/xml")
     public StreamingOutput getAllStudents() throws JAXBException {   
         // TODO fix: this is returning the students within the gradebooks too, not just title + ID
+        // TODO: this should search gradebookMap and secGradebookMap
+        
         // set up marshaller.
         JAXBContext jc = JAXBContext.newInstance( GradebookMap.class, Gradebook.class );
         Marshaller m = jc.createMarshaller();
@@ -108,6 +120,7 @@ public class GradeBookResource {
     @Produces("application/xml")
     public StreamingOutput allStudentsInGradebook(@PathParam("id") String id) throws JAXBException
     {
+        // TODO this should search gradebookMap and secGradebookMap
         // set up marshaller.
         JAXBContext jc = JAXBContext.newInstance( Gradebook.class );
         Marshaller m = jc.createMarshaller();
@@ -136,6 +149,7 @@ public class GradeBookResource {
     @Path("{id}/student/{name}")
     @Produces("application/xml")
     public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
+        // TODO: this should search gradebookMap and secGradebookMap
         if (this.gradebookMap.containsKey(UUID.fromString(id))) {
             return Response
                     .ok("name: " + name + " | grade: " + this.gradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
