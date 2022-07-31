@@ -3,6 +3,7 @@ package com.comp655.distributedgradebook.resources;
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookList;
 import com.comp655.distributedgradebook.GradebookMap;
+import com.comp655.distributedgradebook.Server;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -13,6 +14,9 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.client.Client;
+import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
 import jakarta.ws.rs.core.StreamingOutput;
@@ -21,6 +25,7 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -36,14 +41,17 @@ import java.util.regex.Pattern;
 public class GradeBookResource {
     
     private GradebookMap<UUID, Gradebook> gradebookMap = new GradebookMap<>();
+    
     @Inject
     SecondaryResource secGradebookRes;
+    @Inject
+    SystemNetworkResource networkContext;
     
     
     public GradebookMap<UUID, Gradebook> getPrimaryGradebookMap() {
         return gradebookMap;
     }
-    
+        
     @GET
     @Produces("application/xml")
     public StreamingOutput getAllStudents() throws JAXBException {   
@@ -121,6 +129,7 @@ public class GradeBookResource {
     public StreamingOutput allStudentsInGradebook(@PathParam("id") String id) throws JAXBException
     {
         // TODO this should search gradebookMap and secGradebookMap
+        // and if not found search remotes
         // set up marshaller.
         JAXBContext jc = JAXBContext.newInstance( Gradebook.class );
         Marshaller m = jc.createMarshaller();
@@ -149,21 +158,40 @@ public class GradeBookResource {
     @Path("{id}/student/{name}")
     @Produces("application/xml")
     public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
-        if (this.gradebookMap.containsKey(UUID.fromString(id)) &&
-            this.gradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+        if (this.gradebookMap.containsKey(UUID.fromString(id))) {
+            if (this.gradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
             // found student in a primary gradebook
             return Response
                     .ok("name: " + name + " | grade: " + this.gradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
                     .build();
+            }
+            // found gradebook but not student
+            return Response
+                    .status(Status.NOT_FOUND)
+                    .build();
         }
         // didn't find student in primary ... look in secondary
-        GradebookMap<UUID, Gradebook> secGradebookMap = secGradebookRes.getSecondaryGradebookMap();
-        if (secGradebookMap.containsKey(UUID.fromString(id)) &&
-            secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+        GradebookMap<UUID, Gradebook> secGradebookMap = secGradebookRes.getLocalSecondaryGradebooks();
+        if (secGradebookMap.containsKey(UUID.fromString(id))) {
+            if (secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
             // found student in a primary gradebook
             return Response
                     .ok("name: " + name + " | grade: " + secGradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
                     .build();
+            }
+            // found gradebook but not student
+            return Response
+                    .status(Status.NOT_FOUND)
+                    .build();
+        }
+        // did not find locally, look in remote server
+        ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
+        Client c = ClientBuilder.newClient();
+        for (Server remote : networkPeerList) {
+            Response rsp = c.target(remote.getUrl().toString() + "/gradebook/" + id + "/student/" + name).request(MediaType.APPLICATION_XML).get();
+            if (rsp.getStatus() == 200) {
+                return rsp;
+            }
         }
         return Response
                 .status(Status.NOT_FOUND)
@@ -204,7 +232,7 @@ public class GradeBookResource {
                     .status(Status.BAD_REQUEST)
                     .build();
         }
-        this.gradebookMap.get(UUID.fromString(id)).addStudent(name, grade);
+        this.gradebookMap.get(UUID.fromString(id)).addOrUpdateStudent(name, grade);
 
         // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
         // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
@@ -230,7 +258,7 @@ public class GradeBookResource {
                     .status(Status.BAD_REQUEST)
                     .build();
         }
-        this.gradebookMap.get(UUID.fromString(id)).addStudent(name, grade);
+        this.gradebookMap.get(UUID.fromString(id)).addOrUpdateStudent(name, grade);
 
         // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
         // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
