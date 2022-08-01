@@ -39,7 +39,7 @@ public class Gradebook {
     {
         this.title = "default";
         this.students = new ConcurrentHashMap<>();
-        this.students = new ConcurrentHashMap<>();
+        this.studentMap = new ConcurrentHashMap<>();
     }
 
     @XmlElement(name = "id")

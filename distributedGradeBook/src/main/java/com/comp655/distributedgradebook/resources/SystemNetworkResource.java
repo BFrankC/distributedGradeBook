@@ -11,9 +11,11 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.net.MalformedURLException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 
@@ -45,21 +47,47 @@ public class SystemNetworkResource {
     /*
     * this method is for this distributedGradeBook instance to join the network
     * when manually provided with one valid address for another instance
+    *
+    * call it with a full host.domain:port/app_uri/ string
     */
     @PUT
     @Path("join_network/{address}")
     public Response joinNetwork(@PathParam("address") String address) {
-        String instanceUri = getLocalUri().toString();
-        // PUT {address}/admin/peer/{local_address}
-        // receive 200
+        String rem_address = address.split(":")[0];
+        int rem_port = Integer.parseInt(address.split(":")[1].split("/")[0]);
+        String rem_appPath = address.split("/")[1];
+        URL remoteUrl;
+        try {
+            remoteUrl = new URL(protocol, rem_address, rem_port, rem_appPath);
+        } catch (MalformedURLException e) {
+            return Response
+                    .status(Response.Status.BAD_REQUEST)
+                    .build();
+        }
+        String localUri = getLocalUri().toString();
+        Client c = ClientBuilder.newClient();
+        Response rsp;
+        try {
+            rsp = c.target(remoteUrl.toURI()).request().put(Entity.xml(localUri));
+        } catch (URISyntaxException e) {
+            return Response
+                    .status(Response.Status.BAD_REQUEST)
+                    .build();
+        }
+        if (rsp != null) {
+            // jaxb unmarshal
             // parse returned XML for servers to add to local networkMembers EXCEPT address and local_address
+            return Response
+                    .ok()
+                    .build();
+        }
         return Response
-                .status(Response.Status.NOT_IMPLEMENTED)
+                .status(Response.Status.BAD_REQUEST)
                 .build();
     }
     
     private URL getLocalUri() {
-        if (localIPv4Address != "") {
+        if (!"".equals(localIPv4Address)) {
             return buildLocalUri();
         }
         
@@ -96,10 +124,11 @@ public class SystemNetworkResource {
     }
         
     /*
-    * this method is for a remote distributedGradeBook instance to join the network. 
+    * this method is only for automated access from a
+    * remote distributedGradeBook instance to join the network. 
     */
     @PUT
-    @Path("/admin/peer/{address}")
+    @Path("peer/{address}")
     public Response addServerToNetwork(@PathParam("address") String address) {
         Server newServer = new Server();
         try {
@@ -111,7 +140,7 @@ public class SystemNetworkResource {
         }
         networkMembers.add(newServer);
         return Response
-                // TODO send a list of this server's peers
+                // TODO send an XML list of this server's peers
                 .ok()
                 .build();
     }
