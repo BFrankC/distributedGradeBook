@@ -14,6 +14,9 @@ import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -33,7 +36,7 @@ public class SystemNetworkResource {
     private Server thisServer = new Server();
     
     public SystemNetworkResource() {
-        
+        this.thisServer.setUrl(getLocalUrl());
     }
     
     public Server getLocalServer() {
@@ -64,7 +67,7 @@ public class SystemNetworkResource {
                     .status(Response.Status.BAD_REQUEST)
                     .build();
         }
-        String localUri = getLocalUri().toString();
+        String localUri = getLocalUrl().toString();
         Client c = ClientBuilder.newClient();
         Response rsp;
         try {
@@ -86,7 +89,7 @@ public class SystemNetworkResource {
                 .build();
     }
     
-    private URL getLocalUri() {
+    public URL getLocalUrl() {
         if (!"".equals(localIPv4Address)) {
             return buildLocalUri();
         }
@@ -124,7 +127,7 @@ public class SystemNetworkResource {
     }
         
     /*
-    * this method is only for automated access from a
+    * this method is for automated or manual access from a
     * remote distributedGradeBook instance to join the network. 
     */
     @PUT

@@ -4,6 +4,8 @@
  */
 package com.comp655.distributedgradebook;
 
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
 import java.net.URL;
 import java.util.UUID;
 
@@ -11,6 +13,7 @@ import java.util.UUID;
  *
  * @author berrm
  */
+@XmlRootElement
 public class Server {
     private URL url;
     private final UUID id = UUID.randomUUID();
@@ -19,6 +22,7 @@ public class Server {
         
     }
     
+    @XmlElement(name = "url")
     public URL getUrl() {
         return this.url;
     }
@@ -27,6 +31,7 @@ public class Server {
         this.url = url;
     }
     
+    @XmlElement(name = "uuid")
     public UUID getId() {
         return this.id;
     }

@@ -25,6 +25,7 @@ import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -56,7 +57,7 @@ public class GradeBookResource {
     @Produces("application/xml")
     public StreamingOutput getAllStudents() throws JAXBException {   
         // TODO fix: this is returning the students within the gradebooks too, not just title + ID
-        // TODO: this should search gradebookMap and secGradebookMap
+        // TODO: this should search local and remote gradebookMap
         
         // set up marshaller.
         JAXBContext jc = JAXBContext.newInstance( GradebookMap.class, Gradebook.class );
@@ -69,6 +70,31 @@ public class GradeBookResource {
                 Logger.getLogger(GradebookList.class.getName()).log(Level.SEVERE, null, ex);
             }
         };
+    }
+    
+    /*
+    * only have to search for primaries.
+    * this method's caller may want to read or write, and 
+    * when primary is found, it will have the url of a secondary
+    * (if one exists)
+    */
+    private URL searchLocalAndRemote(UUID uuid) {
+        URL url = null; 
+        
+        if (gradebookMap.contains(uuid)) {
+            url = networkContext.getLocalUrl();
+        } else {
+            for (Server peer : networkContext.getPeersInNetwork()) {
+                URL remote = peer.getUrl();
+                Client c = ClientBuilder.newClient();
+                Response rsp;
+                rsp = c.target(remote.toString() + "/gradebook/" + uuid.toString()).request(MediaType.APPLICATION_XML).get();
+                if (rsp.getStatus() == 200) {
+                    return remote;
+                }
+            }
+        }
+        return url;
     }
     
     @PUT
@@ -112,8 +138,11 @@ public class GradeBookResource {
     public Response deleteGradebookByID(@PathParam("id") String id) {
         Gradebook removed = gradebookMap.remove(UUID.fromString(id));
         if (removed != null) {
-            // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-            // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+            if (removed.getSecondaryUrl() != null) {
+                Client c = ClientBuilder.newClient();
+                Response rsp;
+                rsp = c.target(removed.getSecondaryUrl().toString() + "/gradebook/" + id).request().delete();
+            }
             return Response
                     .ok("Deleted gradebook " + removed.getTitle())
                     .build();
