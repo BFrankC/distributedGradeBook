@@ -7,6 +7,8 @@ package com.comp655.distributedgradebook;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlElementWrapper;
 import jakarta.xml.bind.annotation.XmlRootElement;
+import java.io.Serializable;
+import java.net.URL;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,17 +25,21 @@ public class Gradebook {
     private final UUID id = UUID.randomUUID();
     private String title;
     private ConcurrentHashMap<String, String> students;
+    private ConcurrentHashMap<String, Student> studentMap;
+    private URL secondaryURL = null;
     
     public Gradebook (String title)
     {
         this.title = title;
         this.students = new ConcurrentHashMap<>();
+        this.studentMap = new ConcurrentHashMap<>();
     }
     
     public Gradebook ()
     {
         this.title = "default";
         this.students = new ConcurrentHashMap<>();
+        this.studentMap = new ConcurrentHashMap<>();
     }
 
     @XmlElement(name = "id")
@@ -47,10 +53,11 @@ public class Gradebook {
     {
         return this.title;
     }
+    
     @XmlElement(name = "students")
     public String getStudents()
     {
-        return students.keySet().toString();
+        return studentMap.keySet().toString();
     }
     
     public void setTitle(String newTitle)
@@ -59,21 +66,37 @@ public class Gradebook {
     }
    
 
-    public void addStudent(String name, String grade) {
-        students.put(name, grade);
+    public void addOrUpdateStudent(String name, String grade) {
+        Student s = studentMap.get(name);
+        if (s != null) {
+            s.setGrade(grade);
+        } else {
+            Student nS = new Student();
+            nS.setGrade(grade);
+            nS.setName(name);
+            studentMap.put(name, nS);
+        }
     }
     
     public String getStudentGrade(String studentName) {
-        if (students.containsKey(studentName)) {
-            return students.get(studentName);
+        if (studentMap.containsKey(studentName)) {
+            return studentMap.get(studentName).getName();
         }
         return "";
     }
     
     public void deleteStudent(String name) {
-        if (students.containsKey(name)) {
-            students.remove(name);
+        if (studentMap.containsKey(name)) {
+            studentMap.remove(name);
         }
+    }
+    
+    public void setSecondaryUrl(URL url) {
+        this.secondaryURL = url;
+    }
+    
+    public URL getSecondaryUrl() {
+        return this.secondaryURL;
     }
 
 }
