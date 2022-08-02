@@ -22,35 +22,28 @@ import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
 import jakarta.xml.bind.Unmarshaller;
-import java.io.BufferedOutputStream;
-import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.io.StringReader;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.xml.stream.XMLStreamWriter;
 import javax.xml.transform.stream.StreamSource;
 
 @Path("/admin")
 @ApplicationScoped
 public class SystemNetworkResource {
-    private String protocol = "http";
+    private final String protocol = "http";
     String localIPv4Address = "";
     // TODO add RESTful getters and setters for the following two Strings
     private int port = 8080;
-    private String appPath = "/distributedGradeBook";
+    private final String appPath = "/distributedGradeBook";
     
     private ArrayList<Server> networkMembers = new ArrayList<Server>();
     
-    private Server thisServer = new Server();
+    private final Server thisServer = new Server();
     
     public SystemNetworkResource() {
         this.thisServer.setUrl(getLocalUrl());

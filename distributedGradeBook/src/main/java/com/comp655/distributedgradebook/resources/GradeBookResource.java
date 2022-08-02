@@ -14,7 +14,6 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
-import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.core.MediaType;
@@ -24,13 +23,10 @@ import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
-import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -84,12 +80,13 @@ public class GradeBookResource {
     }
     
     /*
+    * returns a 
     * only have to search for primaries.
     * this method's caller may want to read or write, and 
     * when primary is found, it will have the url of a secondary
     * (if one exists)
     */
-    private URL searchLocalAndRemote(UUID uuid) {
+    public URL searchLocalAndRemote(UUID uuid) {
         URL url = null; 
         
         if (gradebookMap.contains(uuid)) {
@@ -123,6 +120,7 @@ public class GradeBookResource {
         return Response
                 // a gradebook with this UUID already existed
                 // but it shouldn't have
+                // and has now been replaced
                 .status(Status.CONFLICT)
                 .build();
     }
@@ -130,15 +128,7 @@ public class GradeBookResource {
     @POST
     @Path("{name}")   
     public Response postCreatePrimaryGradebook(@PathParam("name") String name) {
-        Gradebook newBook = new Gradebook(name);
-        if (gradebookMap.put(newBook.getID(), newBook) == null) {
-            return Response
-                    .ok("Added new primary gradebook " + 
-                            name + 
-                            " | id: " + 
-                            newBook.getID())
-                    .build();
-        } 
+        // TODO copy/paste putCreatePrimaryGradebook here when finished
         return Response
                 .status(Status.CONFLICT)
                 .build();
@@ -308,20 +298,7 @@ public class GradeBookResource {
                                              @PathParam("name") String name,
                                              @PathParam("grade") String grade
                                         ) {
-        if (!this.gradebookMap.containsKey(UUID.fromString(id))) {
-            return Response
-                    .status(Status.NOT_FOUND)
-                    .build();
-        }
-        if (!isValidGrade(grade)) {
-            return Response
-                    .status(Status.BAD_REQUEST)
-                    .build();
-        }
-        this.gradebookMap.get(UUID.fromString(id)).addOrUpdateStudent(name, grade);
-
-        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+        // TODO just copy addStudentToGradebook when that one is done
         return Response
                 .ok()
                 .build();

@@ -5,14 +5,10 @@
 package com.comp655.distributedgradebook;
 
 import jakarta.xml.bind.annotation.XmlElement;
-import jakarta.xml.bind.annotation.XmlElementWrapper;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import java.io.Serializable;
 import java.net.URL;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentHashMap.KeySetView;
 
 
 /**
@@ -24,21 +20,18 @@ public class Gradebook {
 
     private final UUID id = UUID.randomUUID();
     private String title;
-    private ConcurrentHashMap<String, String> students;
     private ConcurrentHashMap<String, Student> studentMap;
     private URL secondaryURL = null;
     
     public Gradebook (String title)
     {
         this.title = title;
-        this.students = new ConcurrentHashMap<>();
         this.studentMap = new ConcurrentHashMap<>();
     }
     
     public Gradebook ()
     {
         this.title = "default";
-        this.students = new ConcurrentHashMap<>();
         this.studentMap = new ConcurrentHashMap<>();
     }
 
@@ -80,7 +73,7 @@ public class Gradebook {
     
     public String getStudentGrade(String studentName) {
         if (studentMap.containsKey(studentName)) {
-            return studentMap.get(studentName).getName();
+            return studentMap.get(studentName).getGrade();
         }
         return "";
     }

@@ -5,14 +5,11 @@
 package com.comp655.distributedgradebook.resources;
 
 import com.comp655.distributedgradebook.Gradebook;
-import com.comp655.distributedgradebook.GradebookList;
 import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.Server;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
-import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -20,15 +17,21 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
-import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 import java.io.OutputStream;
+import java.io.StringReader;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import javax.xml.transform.stream.StreamSource;
 
 /**
  * This resource provides the /app-root/secondary/ endpoints.
@@ -71,31 +74,57 @@ public class SecondaryResource {
                         .status(Response.Status.CONFLICT)
                         .build();
             }
-            // create remote copy
+            // create remote copy of local Gradebook
+            Gradebook bookToCopy = localBooks.get(UUID.fromString(id));
+            // choose a destination
             ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
             Random random = new Random();
-            String remoteAddress = networkPeerList.get(random.nextInt(networkPeerList.size()))
+            Server randomDestination = networkPeerList.get(random.nextInt(networkPeerList.size()));
+            String remoteAddress = randomDestination
                     .getUrl()
-                    .toString();
-            JAXBContext jc = JAXBContext.newInstance( Gradebook.class );
-            Marshaller m = jc.createMarshaller();
+                    .toString() + "/secondary/" + id;
+            // marshal bookToCopy and send to a REST resource
+            // that can unmarshal and add it to the destination secondary map
+            // this will preserve the name and UUID
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
+            Marshaller m = c.createMarshaller();
             m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
-        } else {
-            // id not local, create local copy
-            // for server in network peer list:
-                // /server/get/gradebook/{id}/student
-                // if found
-                    // store results locally in new gradebook
-                    // update remote gradebook with local URL
-                        // new REST resource PUT/POST /gradebook/{id}/secondaryURL/
-                    // response 200 or 201
-                // if NOT found
-                    // response BAD_REQUEST
-        }
-        return Response
-                // either local copy 
-                .status(Response.Status.INTERNAL_SERVER_ERROR)
+            StreamingOutput out = (OutputStream os) -> {
+                try {
+                    m.marshal(bookToCopy, os);
+                } catch (JAXBException ex) {
+                    Logger.getLogger(SecondaryResource.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            };
+            // new client, request, send to /remoteAddress/secondary/id
+            // then put remoteAddress in bookToCopy.setSecondaryUrl()
+            Client cli = ClientBuilder.newClient();
+            Response rsp = cli.target(remoteAddress).request().put(Entity.xml(out));
+            bookToCopy.setSecondaryUrl(randomDestination.getUrl());
+            return Response
+                .ok()
                 .build();
+        } else {
+            // id not found locally, find remotely and store locally here
+            URL remoteLocation = priGradebookRes.searchLocalAndRemote(UUID.fromString(id));
+            if (remoteLocation == null ) {
+                return Response
+                        .status(Response.Status.NOT_FOUND)
+                        .build();
+            }
+            Client cli = ClientBuilder.newClient();
+            Response rsp = cli.target(remoteLocation + "/gradebook/" + id + "/student").request().get();
+            // jaxb unmarshal
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
+            Unmarshaller u = c.createUnmarshaller();
+            StringBuffer xmlString = new StringBuffer(rsp.readEntity(String.class));
+            Gradebook importedGradebook = (Gradebook) u.unmarshal(new StreamSource(new StringReader(xmlString.toString())));
+            this.secondaryGradebookMap.put(importedGradebook.getID(), importedGradebook);
+            
+            return Response
+                    .ok()
+                    .build();
+        }
     }
     
     @POST
@@ -111,14 +140,22 @@ public class SecondaryResource {
     @Path("{id}")   
     public Response deleteSecondaryGradebookById(@PathParam("id") String id) {
         Gradebook removed = secondaryGradebookMap.remove(UUID.fromString(id));
-        if (removed != null) {
-            // TODO notify removed's primary copy that secondary URL is no longer valid
+        if (removed == null) {
             return Response
-                    .ok("Deleted secondary gradebook " + removed.getTitle())
-                    .build();
-        }
-        return Response
                 .status(Response.Status.NOT_FOUND)
+                .build();
+        }
+        // notify removed's primary copy that secondary URL is no longer valid
+        URL primaryLocation = priGradebookRes.searchLocalAndRemote(UUID.fromString(id));
+        if (primaryLocation != null) {
+            Client c = ClientBuilder.newClient();
+            
+            //TODO this is not right, do not delete the primary copy, merely delete it's secondaryUrl
+            c.target(primaryLocation.toString() + "/gradebook/" + id).request().delete();
+        }
+        
+        return Response
+                .ok("Deleted secondary gradebook " + removed.getTitle())
                 .build();
     }
 }
