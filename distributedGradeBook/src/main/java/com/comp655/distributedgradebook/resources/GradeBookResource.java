@@ -3,6 +3,7 @@ package com.comp655.distributedgradebook.resources;
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookList;
 import com.comp655.distributedgradebook.GradebookMap;
+import com.comp655.distributedgradebook.IdName;
 import com.comp655.distributedgradebook.Server;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -27,7 +28,9 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -55,17 +58,25 @@ public class GradeBookResource {
         
     @GET
     @Produces("application/xml")
-    public StreamingOutput getAllStudents() throws JAXBException {   
-        // TODO fix: this is returning the students within the gradebooks too, not just title + ID
-        // TODO: this should search local and remote gradebookMap
+    public StreamingOutput getAllGradebooks() throws JAXBException {   
+        
+        GradebookList list = new GradebookList();
+        
+        for (UUID uuid : gradebookMap.keySet()) {
+            list.getPrimary().add(new IdName(uuid.toString(),gradebookMap.get(uuid).getTitle()));
+        }
+        
+        for (UUID uuid : secGradebookRes.getLocalSecondaryGradebooks().keySet()) {
+            list.getPrimary().add(new IdName(uuid.toString(),secGradebookRes.getLocalSecondaryGradebooks().get(uuid).getTitle()));
+        }
         
         // set up marshaller.
-        JAXBContext jc = JAXBContext.newInstance( GradebookMap.class, Gradebook.class );
+        JAXBContext jc = JAXBContext.newInstance(GradebookList.class, IdName.class);// GradebookList.class, IdName.class );
         Marshaller m = jc.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         return (OutputStream outputStream) -> {
             try {
-                m.marshal(gradebookMap, outputStream);
+                m.marshal(list, outputStream);
             } catch (JAXBException ex) {
                 Logger.getLogger(GradebookList.class.getName()).log(Level.SEVERE, null, ex);
             }
