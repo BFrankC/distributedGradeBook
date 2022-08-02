@@ -1,5 +1,10 @@
-com/comp655/distributedgradebook/GradeBookApplication.class
+com/comp655/distributedgradebook/resources/SystemNetworkResource.class
 com/comp655/distributedgradebook/resources/SecondaryResource.class
+com/comp655/distributedgradebook/IdName.class
+com/comp655/distributedgradebook/Server.class
+com/comp655/distributedgradebook/Gradebook.class
+com/comp655/distributedgradebook/GradebookMap.class
+com/comp655/distributedgradebook/GradeBookApplication.class
+com/comp655/distributedgradebook/Student.class
 com/comp655/distributedgradebook/GradebookList.class
 com/comp655/distributedgradebook/resources/GradeBookResource.class
-com/comp655/distributedgradebook/Gradebook.class

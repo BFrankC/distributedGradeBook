@@ -13,13 +13,34 @@ import java.util.List;
  *
  * @author ben
  */
-@XmlRootElement
-public class GradebookList<E> extends ArrayList<E> {
+@XmlRootElement()
+public class GradebookList {
+    private ArrayList<IdName> primary;
+    private ArrayList<IdName> secondary;
     
-    @XmlElement(name = "gradebook")
-    public List getGradebookList() {
-        return this;
+    @XmlElement(name = "Primary gradebooks")
+    public List getPrimaryList() {
+        return primary;
     }
+    public ArrayList<IdName> getPrimary()
+    {
+        return primary;
+    }
+    public ArrayList<IdName> getSecondary()
+    {
+        return secondary;
+    }
+    
+    @XmlElement(name = "Secondary gradebooks")
+    public List getSecondaryList() {
+        return secondary;
+    }
+    public GradebookList()
+    {
+        primary = new ArrayList<>();
+        secondary = new ArrayList<>();
+    }
+    
 }
 
 
