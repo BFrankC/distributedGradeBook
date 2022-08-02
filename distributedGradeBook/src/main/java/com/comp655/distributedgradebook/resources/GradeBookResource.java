@@ -5,6 +5,7 @@ import com.comp655.distributedgradebook.GradebookList;
 import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.IdName;
 import com.comp655.distributedgradebook.Server;
+import com.comp655.distributedgradebook.Student;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -177,7 +178,7 @@ public class GradeBookResource {
         // TODO this should search gradebookMap and secGradebookMap
         // and if not found search remotes
         // set up marshaller.
-        JAXBContext jc = JAXBContext.newInstance( Gradebook.class );
+        JAXBContext jc = JAXBContext.newInstance( Gradebook.class, Student.class );
         Marshaller m = jc.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         
@@ -203,13 +204,12 @@ public class GradeBookResource {
     @GET
     @Path("{id}/student/{name}")
     @Produces("application/xml")
-    public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
+    public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) throws JAXBException {
+        Student studentToFind = null;
         if (this.gradebookMap.containsKey(UUID.fromString(id))) {
             if (this.gradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
-            // found student in a primary gradebook
-            return Response
-                    .ok("name: " + name + " | grade: " + this.gradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
-                    .build();
+                // found student in a primary gradebook
+                studentToFind = this.gradebookMap.get(UUID.fromString(id)).getStudent(name);
             }
             // found gradebook but not student
             return Response
@@ -218,12 +218,10 @@ public class GradeBookResource {
         }
         // didn't find student in primary ... look in secondary
         GradebookMap<UUID, Gradebook> secGradebookMap = secGradebookRes.getLocalSecondaryGradebooks();
-        if (secGradebookMap.containsKey(UUID.fromString(id))) {
+        if (studentToFind == null && secGradebookMap.containsKey(UUID.fromString(id))) {
             if (secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
-            // found student in a primary gradebook
-            return Response
-                    .ok("name: " + name + " | grade: " + secGradebookMap.get(UUID.fromString(id)).getStudentGrade(name))
-                    .build();
+                // found student in a secondary gradebook
+                studentToFind = secGradebookMap.get(UUID.fromString(id)).getStudent(name);
             }
             // found gradebook but not student
             return Response
@@ -231,13 +229,31 @@ public class GradeBookResource {
                     .build();
         }
         // did not find locally, look in remote server
-        ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
-        Client c = ClientBuilder.newClient();
-        for (Server remote : networkPeerList) {
-            Response rsp = c.target(remote.getUrl().toString() + "/gradebook/" + id + "/student/" + name).request(MediaType.APPLICATION_XML).get();
-            if (rsp.getStatus() == 200) {
-                return rsp;
+        if (studentToFind == null) {
+            ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
+            Client c = ClientBuilder.newClient();
+            for (Server remote : networkPeerList) {
+                Response rsp = c.target(remote.getUrl().toString() + "/gradebook/" + id + "/student/" + name).request(MediaType.APPLICATION_XML).get();
+                if (rsp.getStatus() == 200) {
+                    return rsp;
+                }
             }
+        } else {
+            // found student
+            Student stuToSend = studentToFind;
+            JAXBContext c = JAXBContext.newInstance(Student.class);
+            Marshaller m = c.createMarshaller();
+            m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+            StreamingOutput out = (OutputStream os) -> {
+                try {
+                    m.marshal(stuToSend, os);
+                } catch (JAXBException ex) {
+                    Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            };
+            return Response
+                .ok(out)
+                .build();
         }
         return Response
                 .status(Status.NOT_FOUND)

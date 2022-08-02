@@ -71,6 +71,10 @@ public class Gradebook {
         }
     }
     
+    public Student getStudent(String studentName) {
+        return this.studentMap.get(studentName);
+    }
+    
     public String getStudentGrade(String studentName) {
         if (studentMap.containsKey(studentName)) {
             return studentMap.get(studentName).getGrade();
