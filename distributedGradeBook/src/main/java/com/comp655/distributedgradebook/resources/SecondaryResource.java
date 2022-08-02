@@ -68,7 +68,7 @@ public class SecondaryResource {
         GradebookMap<UUID, Gradebook> localBooks = this.getLocalPrimaryGradebooks();
         if (localBooks.contains(UUID.fromString(id))) {
             // id found locally:
-            if (localBooks.get(UUID.fromString(id)).getSecondaryUrl() != null) {
+            if ( localBooks.get(UUID.fromString(id)).getSecondaryUrl() != null ) {
                 // max of one secondary already exists
                 return Response
                         .status(Response.Status.CONFLICT)
@@ -133,6 +133,29 @@ public class SecondaryResource {
         //  TODO copy/paste other method when it is working/done
         return Response
                 .status(Response.Status.NOT_IMPLEMENTED)
+                .build();
+    }
+    
+    /*
+    * this is only called by other instances that have already
+    * validated the values
+    *
+    * if we cared, this would be a huge security issue
+    */
+    @PUT
+    @Path("{id}/update/{name}/grade/{grade}")
+    public Response privateUpdate(@PathParam("id") String id,
+                                    @PathParam("name") String name,
+                                    @PathParam("grade") String grade) {
+        if (secondaryGradebookMap.contains(UUID.fromString(id))) {
+            Gradebook bookToUpdate = secondaryGradebookMap.get(UUID.fromString(id));
+            bookToUpdate.addOrUpdateStudent(name, grade);
+            return Response
+                .ok()
+                .build();
+        }
+        return Response
+                .status(Response.Status.NOT_FOUND)
                 .build();
     }
     

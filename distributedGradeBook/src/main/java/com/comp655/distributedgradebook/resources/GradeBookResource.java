@@ -16,6 +16,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
+import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.Response.Status;
@@ -282,10 +283,20 @@ public class GradeBookResource {
                     .status(Status.BAD_REQUEST)
                     .build();
         }
-        this.gradebookMap.get(UUID.fromString(id)).addOrUpdateStudent(name, grade);
+        Gradebook bookToUpdate = this.gradebookMap.get(UUID.fromString(id));
+        // update local primary copy
+        bookToUpdate.addOrUpdateStudent(name, grade);
+        //update remote secondary copy if such exists
+        if (bookToUpdate.getSecondaryUrl() != null) {
+            Client cli = ClientBuilder.newClient();
+            String targetAddress = bookToUpdate.getSecondaryUrl().toString() + "/" + id + "/update/" + name + "/grade/" + grade;
+            cli.target(targetAddress)
+                .request()
+                .put(Entity.text(name+grade));
+        }
 
-        // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-        // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+        // updates not permitted on secondary copies
+        
         return Response
                 .ok()
                 .build();
