@@ -9,11 +9,7 @@ import jakarta.xml.bind.annotation.XmlRootElement;
 import java.net.URL;
 import java.util.UUID;
 
-/**
- *
- * @author berrm
- */
-@XmlRootElement
+@XmlRootElement (name = "server")
 public class Server {
     private URL url;
     private final UUID id = UUID.randomUUID();
