@@ -138,14 +138,29 @@ public class GradeBookResource {
     public Response deleteGradebookByID(@PathParam("id") String id) {
         Gradebook removed = gradebookMap.remove(UUID.fromString(id));
         if (removed != null) {
+            // found and deleted locally, try deleting secondary if it exists
             if (removed.getSecondaryUrl() != null) {
                 Client c = ClientBuilder.newClient();
                 Response rsp;
                 rsp = c.target(removed.getSecondaryUrl().toString() + "/gradebook/" + id).request().delete();
+                // probably should verify response code and reinstate local copy if remote didn't delete
+                // to prevent orphans in secondaries system-wide,
+                // but that is probably outside the scope of this project
             }
             return Response
                     .ok("Deleted gradebook " + removed.getTitle())
                     .build();
+        } else {
+            // id wasn't found local, try remote
+            URL remoteLocation = searchLocalAndRemote(UUID.fromString(id));
+            if (remoteLocation != null) {
+                // id was found remotely
+                Client c = ClientBuilder.newClient();
+                Response rsp;
+                // call delete, if it exists remote's delete will delete gradebook's secondary recursively
+                rsp = c.target(remoteLocation.toString() + "/gradebook/" + id).request().delete();
+                return rsp;
+            }
         }
         return Response
                 .status(Status.NOT_FOUND)
@@ -229,14 +244,19 @@ public class GradeBookResource {
     
     @DELETE
     @Path("{id}/student/{name}")
-    @Produces("application/xml")
     public Response deleteStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) {
         if (this.gradebookMap.containsKey(UUID.fromString(id))) {
             this.gradebookMap.get(UUID.fromString(id)).deleteStudent(name);
-            // - - - - - - - - - - - - - - - - - - T O D O - - - - - - - - - - -
-            // P R O P I G A T E   T O   S E C O N D A R Y   S E R V E R
+            URL remoteGradebook = this.gradebookMap.get(UUID.fromString(id)).getSecondaryUrl();
+            if (remoteGradebook != null) {
+                Client c = ClientBuilder.newClient();
+                Response rsp;
+                rsp = c.target(remoteGradebook.toString() + "/gradebook/" + id + "/student/" + name).request().delete();
+                // assume this was successful
+                // TODO add error checking if rsp.getStatus != 200
+            }
             return Response
-                    .ok("deleted student " + name)
+                    .ok()
                     .build();
         }
         return Response

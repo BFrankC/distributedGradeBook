@@ -9,18 +9,27 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.core.StreamingOutput;
 import jakarta.xml.bind.JAXBContext;
 import jakarta.xml.bind.JAXBException;
 import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.UUID;
 
 @Path("/admin")
 @ApplicationScoped
@@ -37,6 +46,7 @@ public class SystemNetworkResource {
     
     public SystemNetworkResource() {
         this.thisServer.setUrl(getLocalUrl());
+        this.networkMembers.add(thisServer);
     }
     
     public Server getLocalServer() {
@@ -50,36 +60,40 @@ public class SystemNetworkResource {
     /*
     * this method is for this distributedGradeBook instance to join the network
     * when manually provided with one valid address for another instance
-    *
-    * call it with a full host.domain:port/app_uri/ string
     */
     @PUT
-    @Path("join_network/{address}")
-    public Response joinNetwork(@PathParam("address") String address) {
-        String rem_address = address.split(":")[0];
-        int rem_port = Integer.parseInt(address.split(":")[1].split("/")[0]);
-        String rem_appPath = address.split("/")[1];
+    @Path("join_network/host/{host}/port/{port}")
+    public Response joinNetwork(@PathParam("host") String host, @PathParam("port") int port) throws JAXBException {
+        String rem_address = host;
+        int rem_port = port;
         URL remoteUrl;
         try {
-            remoteUrl = new URL(protocol, rem_address, rem_port, rem_appPath);
+            remoteUrl = new URL(protocol, rem_address, rem_port, appPath);
         } catch (MalformedURLException e) {
             return Response
                     .status(Response.Status.BAD_REQUEST)
                     .build();
         }
+        String remoteUri = remoteUrl.toString();
         String localUri = getLocalUrl().toString();
-        Client c = ClientBuilder.newClient();
+        Client cli = ClientBuilder.newClient();
         Response rsp;
         try {
-            rsp = c.target(remoteUrl.toURI()).request().put(Entity.xml(localUri));
+            rsp = cli.target(remoteUrl.toURI()).request().put(Entity.xml(localUri));
         } catch (URISyntaxException e) {
             return Response
                     .status(Response.Status.BAD_REQUEST)
                     .build();
         }
         if (rsp != null) {
+            if (rsp.getStatus() == Response.Status.BAD_REQUEST.ordinal()) {
+                return rsp;     //Bad request from remote
+            }
+            // happy path:
             // jaxb unmarshal
-            // parse returned XML for servers to add to local networkMembers EXCEPT address and local_address
+            JAXBContext c = JAXBContext.newInstance(Server.class);
+            Unmarshaller u = c.createUnmarshaller();
+            // parse returned XML for servers to add to local networkMembers EXCEPT local_address
             return Response
                     .ok()
                     .build();
@@ -131,20 +145,37 @@ public class SystemNetworkResource {
     * remote distributedGradeBook instance to join the network. 
     */
     @PUT
-    @Path("peer/{address}")
-    public Response addServerToNetwork(@PathParam("address") String address) {
+    @Path("peer/host/{host}/port/{port}")
+    @Produces("application/xml")
+    public Response addServerToNetwork(@PathParam("host") String host, @PathParam("port") int port) throws JAXBException, FileNotFoundException {
         Server newServer = new Server();
         try {
-            newServer.setUrl(new URL(address));
+            newServer.setUrl(new URL(protocol, host, port, appPath));
         } catch (MalformedURLException e) {
             return Response
                     .status(Response.Status.BAD_REQUEST)
                     .build();
         }
+        // check for duplicate
+        for (Server s : networkMembers) {
+            if (s.getUrl().equals(newServer.getUrl())) {
+                return Response
+                        .status(Response.Status.BAD_REQUEST)
+                        .build();
+            }
+        }
+        // build and return list
+        JAXBContext c = JAXBContext.newInstance( Server.class );
+        Marshaller m = c.createMarshaller();
+        m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+        File xml = new File("servers.xml");
+        OutputStream os = new FileOutputStream(xml);
+        for (Server s : networkMembers) {
+            m.marshal(s, os);
+        }
         networkMembers.add(newServer);
         return Response
-                // TODO send an XML list of this server's peers
-                .ok()
+                .ok(xml)
                 .build();
     }
 }
