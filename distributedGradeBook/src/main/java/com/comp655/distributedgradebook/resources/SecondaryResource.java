@@ -176,9 +176,7 @@ public class SecondaryResource {
         URL primaryLocation = priGradebookRes.searchLocalAndRemote(UUID.fromString(id));
         if (primaryLocation != null) {
             Client c = ClientBuilder.newClient();
-            
-            //TODO this is not right, do not delete the primary copy, merely delete it's secondaryUrl
-            c.target(primaryLocation.toString() + "/gradebook/" + id).request().delete();
+            c.target(primaryLocation.toString() + "/gradebook/" + id + "/secondary").request().delete();
         }
         
         return Response

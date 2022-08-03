@@ -209,6 +209,17 @@ public class GradeBookResource {
                 .build();
     }
     
+    @DELETE
+    @Path("{id}/secondary")
+    public Response deleteSecondaryUrl(@PathParam("id") String id) {
+        if (gradebookMap.containsKey(UUID.fromString(id))) {
+            gradebookMap.get(UUID.fromString(id)).setSecondaryUrl(null);
+        }
+        return Response
+                .ok()
+                .build();
+    }
+    
     @GET
     @Path("{id}/student")
     @Produces("application/xml")
