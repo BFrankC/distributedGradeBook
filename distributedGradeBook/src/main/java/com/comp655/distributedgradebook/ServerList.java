@@ -24,4 +24,8 @@ public class ServerList {
     public void setServers(List<Server> servers) {
         this.servers = servers;
     }
+    
+    public static boolean equals(Server a, Server b) {
+        return a.getUrl().equals(b.getUrl());
+    }
 }

@@ -46,7 +46,6 @@ public class SystemNetworkResource {
     private final Server thisServer = new Server();
     
     public SystemNetworkResource() {
-        this.thisServer.setUrl(getLocalUrl());
         this.networkMembers.add(thisServer);
     }
     
@@ -84,11 +83,17 @@ public class SystemNetworkResource {
             Unmarshaller u = c.createUnmarshaller();
             StringBuffer xmlString = new StringBuffer(rsp.readEntity(String.class));
             ServerList peers = (ServerList) u.unmarshal(new StreamSource(new StringReader(xmlString.toString())));
-            for (Server s : peers.getServers()) {
-                if (this.networkMembers.contains(s)) {
-                    continue;
+            for (Server newServer : peers.getServers()) {
+                boolean match = false;
+                for (Server knownServer : networkMembers) {
+                    if (ServerList.equals(newServer, knownServer)) {
+                        match = true;
+                        break;
+                    }
                 }
-                this.networkMembers.add(s);
+                if (!match) {
+                    networkMembers.add(newServer);
+                }
             }
             return Response
                     .ok()

@@ -101,22 +101,36 @@ public class GradeBookResource {
                 rsp = c.target(remote.toString() + "/gradebook/" + uuid.toString()).request(MediaType.APPLICATION_XML).get();
                 if (rsp.getStatus() == 200) {
                     return remote;
-                }
+                } 
             }
         }
         return url;
     }
     
+    // !!! any changes to this method MUST be copy/pasted to the @POST version: postCreatePrimaryGradebook
+    // (or refactor them both to call one common private function, if you want :)... )
     @PUT
     @Path("{name}")   
-    public Response putCreatePrimaryGradebook(@PathParam("name") String name) {
+    public Response putCreatePrimaryGradebook(@PathParam("name") String name) throws JAXBException {
         Gradebook newBook = new Gradebook(name);
-        if (gradebookMap.put(newBook.getID(), newBook) == null) {
+        if (!gradebookMap.keySet().contains(newBook.getID())) {
+            // didn't find that UUID locally
+            // TODO: also check gradebook name, and all local and remote primary and secondaries
+            
+            // store newBook - this comment seems redundant but I puzzled over this bug for 20 minutes before I realized the next line wasn't present
+            gradebookMap.put(newBook.getID(), newBook);
+            JAXBContext c = JAXBContext.newInstance( Gradebook.class );
+            Marshaller m = c.createMarshaller();
+            m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+            StreamingOutput out = (OutputStream os) -> {
+                try {
+                    m.marshal(newBook, os);
+                } catch (JAXBException ex) {
+                    Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            };
             return Response
-                    .ok("Added new primary gradebook " + 
-                            name + 
-                            " | id: " + 
-                            newBook.getID())
+                    .ok(out)
                     .build();
         } 
         return Response
@@ -127,11 +141,36 @@ public class GradeBookResource {
                 .build();
     }
     
+    // !!! do not make changes her, make them to putCreatePrimaryGradebook and then copy/paste changes here too.
+    // (or refactor them both to call one common private function, if you want :)... )
     @POST
     @Path("{name}")   
-    public Response postCreatePrimaryGradebook(@PathParam("name") String name) {
-        // TODO copy/paste putCreatePrimaryGradebook here when finished
+    public Response postCreatePrimaryGradebook(@PathParam("name") String name) throws JAXBException {
+        Gradebook newBook = new Gradebook(name);
+        if (!gradebookMap.keySet().contains(newBook.getID())) {
+            // didn't find that UUID locally
+            // TODO: also check gradebook name, and all local and remote primary and secondaries
+            
+            // store newBook - this comment seems redundant but I puzzled over this bug for 20 minutes before I realized the next line wasn't present
+            gradebookMap.put(newBook.getID(), newBook);
+            JAXBContext c = JAXBContext.newInstance( Gradebook.class );
+            Marshaller m = c.createMarshaller();
+            m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+            StreamingOutput out = (OutputStream os) -> {
+                try {
+                    m.marshal(newBook, os);
+                } catch (JAXBException ex) {
+                    Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            };
+            return Response
+                    .ok(out)
+                    .build();
+        } 
         return Response
+                // a gradebook with this UUID already existed
+                // but it shouldn't have
+                // and has now been replaced
                 .status(Status.CONFLICT)
                 .build();
     }
@@ -173,32 +212,39 @@ public class GradeBookResource {
     @GET
     @Path("{id}/student")
     @Produces("application/xml")
-    public StreamingOutput allStudentsInGradebook(@PathParam("id") String id) throws JAXBException
-    {
+    public Response allStudentsInGradebook(@PathParam("id") String id) throws JAXBException {
         // TODO this should search gradebookMap and secGradebookMap
         // and if not found search remotes
-        // set up marshaller.
-        JAXBContext jc = JAXBContext.newInstance( Gradebook.class, Student.class );
-        Marshaller m = jc.createMarshaller();
-        m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         
+        Gradebook bookToFind = null;
         if (gradebookMap.containsKey(UUID.fromString(id))) {
-            return (OutputStream outputStream) -> {
-                try {
-                    m.marshal(gradebookMap.get(UUID.fromString(id)).getStudents(), outputStream);
-                } catch (JAXBException ex) {
-                    Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            };
+            // found local primary gradebook
+            bookToFind = gradebookMap.get(UUID.fromString(id));
+        } else if (secGradebookRes.getLocalSecondaryGradebooks().containsKey(UUID.fromString(id))) {
+            bookToFind = secGradebookRes.getLocalSecondaryGradebooks().get(UUID.fromString(id));
         }
         
-        return (OutputStream outputStream) -> {
+        if (bookToFind == null) {
+            return Response
+                .status(Status.NOT_FOUND)
+                .build();
+        }
+        
+        // happy path
+        Gradebook bookToSend = bookToFind;
+        JAXBContext c = JAXBContext.newInstance( Gradebook.class );
+        Marshaller m = c.createMarshaller();
+        m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+        StreamingOutput out = (OutputStream os) -> {
             try {
-                m.marshal("gradebook not found", outputStream);
+                m.marshal(bookToSend, os);
             } catch (JAXBException ex) {
                 Logger.getLogger(GradeBookResource.class.getName()).log(Level.SEVERE, null, ex);
             }
         };
+        return Response
+            .ok(out)
+            .build();
     }
     
     @GET
@@ -207,26 +253,30 @@ public class GradeBookResource {
     public Response getStudentFromGradebook(@PathParam("id") String id, @PathParam("name") String name) throws JAXBException {
         Student studentToFind = null;
         if (this.gradebookMap.containsKey(UUID.fromString(id))) {
+            // found local primary gradebook UUID
             if (this.gradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
-                // found student in a primary gradebook
+                // found student in local primary gradebook
                 studentToFind = this.gradebookMap.get(UUID.fromString(id)).getStudent(name);
-            }
-            // found gradebook but not student
-            return Response
+            } else {
+                // did not find student {name}
+                return Response
                     .status(Status.NOT_FOUND)
                     .build();
+            }
         }
         // didn't find student in primary ... look in secondary
         GradebookMap<UUID, Gradebook> secGradebookMap = secGradebookRes.getLocalSecondaryGradebooks();
         if (studentToFind == null && secGradebookMap.containsKey(UUID.fromString(id))) {
+            // found student in local secondary gradebook
             if (secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
                 // found student in a secondary gradebook
                 studentToFind = secGradebookMap.get(UUID.fromString(id)).getStudent(name);
+            } else {
+            // found gradebook but not student {name}
+                return Response
+                        .status(Status.NOT_FOUND)
+                        .build();
             }
-            // found gradebook but not student
-            return Response
-                    .status(Status.NOT_FOUND)
-                    .build();
         }
         // did not find locally, look in remote server
         if (studentToFind == null) {
@@ -282,6 +332,8 @@ public class GradeBookResource {
                 .build();
     }
     
+    //  !!! any changes made to this method must be copy/pasted to the @POST method: updateStudentToGradebook
+    // (or refactor them both to call one common private function, if you want :)... )
     @PUT
     @Path("{id}/student/{name}/grade/{grade}")
     @Produces("application/xml")
@@ -318,6 +370,8 @@ public class GradeBookResource {
                 .build();
     }
     
+    //  !!! do not make changes here.  Change addStudentToGradebook then copy/paste changes back here.
+    // (or refactor them both to call one common private function, if you want :)... )
     @POST
     @Path("{id}/student/{name}/grade/{grade}")
     @Produces("application/xml")

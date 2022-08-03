@@ -7,6 +7,8 @@ package com.comp655.distributedgradebook;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -47,10 +49,18 @@ public class Gradebook {
         return this.title;
     }
     
-    @XmlElement(name = "students")
     public String getStudents()
     {
         return studentMap.keySet().toString();
+    }
+    
+    @XmlElement(name = "students")
+    public List<Student> getStudentList() {
+        List<Student> students = new ArrayList<>();
+        for (String key : studentMap.keySet()) {
+            students.add(studentMap.get(key));
+        }
+        return students;
     }
     
     public void setTitle(String newTitle)

@@ -80,6 +80,10 @@ public class SecondaryResource {
             ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
             Random random = new Random();
             Server randomDestination = networkPeerList.get(random.nextInt(networkPeerList.size()));
+            if (randomDestination.getUrl().equals(networkContext.getLocalServer().getUrl())) {
+                // randomly chose self, choose the next one
+                randomDestination = networkPeerList.get( (networkPeerList.indexOf(randomDestination) + 1) % networkPeerList.size());
+            }
             String remoteAddress = randomDestination
                     .getUrl()
                     .toString() + "/secondary/" + id;
