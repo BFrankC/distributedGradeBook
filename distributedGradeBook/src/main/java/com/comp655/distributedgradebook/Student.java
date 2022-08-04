@@ -7,7 +7,7 @@ package com.comp655.distributedgradebook;
 import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 
-@XmlRootElement
+@XmlRootElement(name = "student")
 public class Student {
     
     private String name = "";

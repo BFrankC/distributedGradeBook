@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @XmlRootElement
 public class Gradebook {
 
-    private final UUID id = UUID.randomUUID();
+    private UUID id = UUID.randomUUID();
     private String title;
     private ConcurrentHashMap<String, Student> studentMap;
     private URL secondaryURL = null;
@@ -35,6 +35,10 @@ public class Gradebook {
     {
         this.title = "default";
         this.studentMap = new ConcurrentHashMap<>();
+    }
+    
+    public void setID(UUID id) {
+        this.id = id;
     }
 
     @XmlElement(name = "id")

@@ -7,6 +7,7 @@ package com.comp655.distributedgradebook.resources;
 import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.Server;
+import com.comp655.distributedgradebook.Student;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -66,7 +67,7 @@ public class SecondaryResource {
     @Path("{id}")   
     public Response putCreateSecondaryGradebook(@PathParam("id") String id) throws JAXBException {
         GradebookMap<UUID, Gradebook> localBooks = this.getLocalPrimaryGradebooks();
-        if (localBooks.contains(UUID.fromString(id))) {
+        if (localBooks.containsKey(UUID.fromString(id))) {
             // id found locally:
             if ( localBooks.get(UUID.fromString(id)).getSecondaryUrl() != null ) {
                 // max of one secondary already exists
@@ -90,7 +91,7 @@ public class SecondaryResource {
             // marshal bookToCopy and send to a REST resource
             // that can unmarshal and add it to the destination secondary map
             // this will preserve the name and UUID
-            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class, Student.class);
             Marshaller m = c.createMarshaller();
             m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
             StreamingOutput out = (OutputStream os) -> {
@@ -119,10 +120,11 @@ public class SecondaryResource {
             Client cli = ClientBuilder.newClient();
             Response rsp = cli.target(remoteLocation + "/gradebook/" + id + "/student").request().get();
             // jaxb unmarshal
-            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class, Student.class);
             Unmarshaller u = c.createUnmarshaller();
             StringBuffer xmlString = new StringBuffer(rsp.readEntity(String.class));
             Gradebook importedGradebook = (Gradebook) u.unmarshal(new StreamSource(new StringReader(xmlString.toString())));
+            importedGradebook.setID(UUID.fromString(id));
             this.secondaryGradebookMap.put(importedGradebook.getID(), importedGradebook);
             
             return Response
@@ -151,7 +153,7 @@ public class SecondaryResource {
     public Response privateUpdate(@PathParam("id") String id,
                                     @PathParam("name") String name,
                                     @PathParam("grade") String grade) {
-        if (secondaryGradebookMap.contains(UUID.fromString(id))) {
+        if (secondaryGradebookMap.containsKey(UUID.fromString(id))) {
             Gradebook bookToUpdate = secondaryGradebookMap.get(UUID.fromString(id));
             bookToUpdate.addOrUpdateStudent(name, grade);
             return Response

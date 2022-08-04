@@ -65,7 +65,7 @@ public class GradeBookResource {
         }
         
         for (UUID uuid : secGradebookRes.getLocalSecondaryGradebooks().keySet()) {
-            list.getPrimary().add(new IdName(uuid.toString(),secGradebookRes.getLocalSecondaryGradebooks().get(uuid).getTitle()));
+            list.getSecondary().add(new IdName(uuid.toString(),secGradebookRes.getLocalSecondaryGradebooks().get(uuid).getTitle()));
         }
         
         // set up marshaller.
@@ -91,14 +91,14 @@ public class GradeBookResource {
     public URL searchLocalAndRemote(UUID uuid) {
         URL url = null; 
         
-        if (gradebookMap.contains(uuid)) {
+        if (gradebookMap.containsKey(uuid)) {
             url = networkContext.getLocalUrl();
         } else {
             for (Server peer : networkContext.getPeersInNetwork()) {
                 URL remote = peer.getUrl();
                 Client c = ClientBuilder.newClient();
                 Response rsp;
-                rsp = c.target(remote.toString() + "/gradebook/" + uuid.toString()).request(MediaType.APPLICATION_XML).get();
+                rsp = c.target(remote.toString() + "/gradebook/" + uuid.toString() + "/student").request(MediaType.APPLICATION_XML).get();
                 if (rsp.getStatus() == 200) {
                     return remote;
                 } 
@@ -113,7 +113,7 @@ public class GradeBookResource {
     @Path("{name}")   
     public Response putCreatePrimaryGradebook(@PathParam("name") String name) throws JAXBException {
         Gradebook newBook = new Gradebook(name);
-        if (!gradebookMap.keySet().contains(newBook.getID())) {
+        if (!gradebookMap.containsKey(newBook.getID())) {
             // didn't find that UUID locally
             // TODO: also check gradebook name, and all local and remote primary and secondaries
             
@@ -147,7 +147,7 @@ public class GradeBookResource {
     @Path("{name}")   
     public Response postCreatePrimaryGradebook(@PathParam("name") String name) throws JAXBException {
         Gradebook newBook = new Gradebook(name);
-        if (!gradebookMap.keySet().contains(newBook.getID())) {
+        if (!gradebookMap.containsKey(newBook.getID())) {
             // didn't find that UUID locally
             // TODO: also check gradebook name, and all local and remote primary and secondaries
             
@@ -243,7 +243,7 @@ public class GradeBookResource {
         
         // happy path
         Gradebook bookToSend = bookToFind;
-        JAXBContext c = JAXBContext.newInstance( Gradebook.class );
+        JAXBContext c = JAXBContext.newInstance( Gradebook.class, Student.class);
         Marshaller m = c.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         StreamingOutput out = (OutputStream os) -> {
