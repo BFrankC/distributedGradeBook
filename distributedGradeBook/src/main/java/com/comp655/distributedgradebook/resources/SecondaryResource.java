@@ -8,6 +8,7 @@ import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.Server;
 import com.comp655.distributedgradebook.Student;
+import com.comp655.distributedgradebook.StudentList;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -91,7 +92,7 @@ public class SecondaryResource {
             // marshal bookToCopy and send to a REST resource
             // that can unmarshal and add it to the destination secondary map
             // this will preserve the name and UUID
-            JAXBContext c = JAXBContext.newInstance(Gradebook.class, Student.class);
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
             Marshaller m = c.createMarshaller();
             m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
             StreamingOutput out = (OutputStream os) -> {
@@ -120,7 +121,7 @@ public class SecondaryResource {
             Client cli = ClientBuilder.newClient();
             Response rsp = cli.target(remoteLocation + "/gradebook/" + id + "/student").request().get();
             // jaxb unmarshal
-            JAXBContext c = JAXBContext.newInstance(Gradebook.class, Student.class);
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
             Unmarshaller u = c.createUnmarshaller();
             StringBuffer xmlString = new StringBuffer(rsp.readEntity(String.class));
             Gradebook importedGradebook = (Gradebook) u.unmarshal(new StreamSource(new StringReader(xmlString.toString())));
@@ -128,7 +129,7 @@ public class SecondaryResource {
             this.secondaryGradebookMap.put(importedGradebook.getID(), importedGradebook);
             
             return Response
-                    .ok()
+                    .ok(xmlString.toString())
                     .build();
         }
     }

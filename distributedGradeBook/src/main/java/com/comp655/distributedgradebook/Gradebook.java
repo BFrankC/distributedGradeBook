@@ -17,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @author ben
  */
-@XmlRootElement
+@XmlRootElement(name = "gradebook")
 public class Gradebook {
 
     private UUID id = UUID.randomUUID();
@@ -53,19 +53,12 @@ public class Gradebook {
         return this.title;
     }
     
-    public String getStudents()
+    @XmlElement(name = "student-list")
+    public ConcurrentHashMap<String, Student> getStudents()
     {
-        return studentMap.keySet().toString();
+        return studentMap;
     }
-    
-    @XmlElement(name = "students")
-    public List<Student> getStudentList() {
-        List<Student> students = new ArrayList<>();
-        for (String key : studentMap.keySet()) {
-            students.add(studentMap.get(key));
-        }
-        return students;
-    }
+
     
     public void setTitle(String newTitle)
     {

@@ -6,6 +6,7 @@ import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.IdName;
 import com.comp655.distributedgradebook.Server;
 import com.comp655.distributedgradebook.Student;
+import com.comp655.distributedgradebook.StudentList;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -243,7 +244,7 @@ public class GradeBookResource {
         
         // happy path
         Gradebook bookToSend = bookToFind;
-        JAXBContext c = JAXBContext.newInstance( Gradebook.class, Student.class);
+        JAXBContext c = JAXBContext.newInstance( Gradebook.class, StudentList.class, Student.class);
         Marshaller m = c.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         StreamingOutput out = (OutputStream os) -> {
@@ -265,7 +266,7 @@ public class GradeBookResource {
         Student studentToFind = null;
         if (this.gradebookMap.containsKey(UUID.fromString(id))) {
             // found local primary gradebook UUID
-            if (this.gradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+            if (this.gradebookMap.get(UUID.fromString(id)).getStudents().containsKey(name)) {
                 // found student in local primary gradebook
                 studentToFind = this.gradebookMap.get(UUID.fromString(id)).getStudent(name);
             } else {
@@ -278,8 +279,8 @@ public class GradeBookResource {
         // didn't find student in primary ... look in secondary
         GradebookMap<UUID, Gradebook> secGradebookMap = secGradebookRes.getLocalSecondaryGradebooks();
         if (studentToFind == null && secGradebookMap.containsKey(UUID.fromString(id))) {
-            // found student in local secondary gradebook
-            if (secGradebookMap.get(UUID.fromString(id)).getStudents().contains(name)) {
+            // found id in local secondary gradebook
+            if (secGradebookMap.get(UUID.fromString(id)).getStudents().containsKey(name)) {
                 // found student in a secondary gradebook
                 studentToFind = secGradebookMap.get(UUID.fromString(id)).getStudent(name);
             } else {
@@ -368,7 +369,7 @@ public class GradeBookResource {
         //update remote secondary copy if such exists
         if (bookToUpdate.getSecondaryUrl() != null) {
             Client cli = ClientBuilder.newClient();
-            String targetAddress = bookToUpdate.getSecondaryUrl().toString() + "/" + id + "/update/" + name + "/grade/" + grade;
+            String targetAddress = bookToUpdate.getSecondaryUrl().toString() + "/secondary/" + id + "/update/" + name + "/grade/" + grade;
             cli.target(targetAddress)
                 .request()
                 .put(Entity.text(name+grade));
