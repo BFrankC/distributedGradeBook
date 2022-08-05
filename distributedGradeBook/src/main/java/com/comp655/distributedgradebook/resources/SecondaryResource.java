@@ -8,7 +8,6 @@ import com.comp655.distributedgradebook.Gradebook;
 import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.Server;
 import com.comp655.distributedgradebook.Student;
-import com.comp655.distributedgradebook.StudentList;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -82,6 +81,13 @@ public class SecondaryResource {
             ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
             Random random = new Random();
             Server randomDestination = networkPeerList.get(random.nextInt(networkPeerList.size()));
+            if (randomDestination.getId().equals(networkContext.getLocalServer().getId())) {
+                // this instance is the only server in the network
+                // sysadmin forgot to setup networking
+                return Response
+                        .status(Response.Status.PRECONDITION_REQUIRED)
+                        .build();
+            }
             if (randomDestination.getUrl().equals(networkContext.getLocalServer().getUrl())) {
                 // randomly chose self, choose the next one
                 randomDestination = networkPeerList.get( (networkPeerList.indexOf(randomDestination) + 1) % networkPeerList.size());
@@ -157,6 +163,22 @@ public class SecondaryResource {
         if (secondaryGradebookMap.containsKey(UUID.fromString(id))) {
             Gradebook bookToUpdate = secondaryGradebookMap.get(UUID.fromString(id));
             bookToUpdate.addOrUpdateStudent(name, grade);
+            return Response
+                .ok()
+                .build();
+        }
+        return Response
+                .status(Response.Status.NOT_FOUND)
+                .build();
+    }
+    
+    @DELETE
+    @Path("{id}/student/{name}")
+    public Response privateDelete(@PathParam("id") String id,
+                                    @PathParam("name") String name) {
+        if (secondaryGradebookMap.containsKey(UUID.fromString(id))) {
+            Gradebook bookToUpdate = secondaryGradebookMap.get(UUID.fromString(id));
+            bookToUpdate.deleteStudent(name);
             return Response
                 .ok()
                 .build();

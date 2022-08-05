@@ -8,9 +8,10 @@ import jakarta.xml.bind.annotation.XmlElement;
 import jakarta.xml.bind.annotation.XmlRootElement;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -22,19 +23,23 @@ public class Gradebook {
 
     private UUID id = UUID.randomUUID();
     private String title;
-    private ConcurrentHashMap<String, Student> studentMap;
+    @XmlElement (name = "student")
+    private ArrayList<Student> studentList;
+    private HashMap<String, Student> studentMap;
     private URL secondaryURL = null;
     
     public Gradebook (String title)
     {
         this.title = title;
-        this.studentMap = new ConcurrentHashMap<>();
+        this.studentList = new ArrayList<>();
+        this.studentMap = new HashMap<>();
     }
     
     public Gradebook ()
     {
         this.title = "default";
-        this.studentMap = new ConcurrentHashMap<>();
+        this.studentList = new ArrayList<>();
+        this.studentMap = new HashMap<>();
     }
     
     public void setID(UUID id) {
@@ -53,12 +58,10 @@ public class Gradebook {
         return this.title;
     }
     
-    @XmlElement(name = "student-list")
-    public ConcurrentHashMap<String, Student> getStudents()
+    public HashMap<String, Student> getStudents()
     {
         return studentMap;
     }
-
     
     public void setTitle(String newTitle)
     {
@@ -67,15 +70,25 @@ public class Gradebook {
    
 
     public void addOrUpdateStudent(String name, String grade) {
-        Student s = studentMap.get(name);
-        if (s != null) {
-            s.setGrade(grade);
+        if (studentMap.containsKey(name)) {
+            studentMap.get(name).setGrade(grade);
         } else {
-            Student nS = new Student();
-            nS.setGrade(grade);
-            nS.setName(name);
-            studentMap.put(name, nS);
+            Student newStudent = new Student();
+            newStudent.setGrade(grade);
+            newStudent.setName(name);
+            studentMap.put(name, newStudent);
         }
+        for (Student s : studentList) {
+            if (s.getName().equals(name)) {
+                s.setGrade(grade);
+                return;
+            }
+        }
+        // if didn't return already, name was not in studentList
+        Student newStu = new Student();
+        newStu.setGrade(grade);
+        newStu.setName(name);
+        studentList.add(newStu);
     }
     
     public Student getStudent(String studentName) {
@@ -90,8 +103,12 @@ public class Gradebook {
     }
     
     public void deleteStudent(String name) {
-        if (studentMap.containsKey(name)) {
-            studentMap.remove(name);
+        studentMap.remove(name);
+        for (Student s : studentList) {
+            if (s.getName().equals(name)) {
+                studentList.remove(s);
+                break;
+            }
         }
     }
     

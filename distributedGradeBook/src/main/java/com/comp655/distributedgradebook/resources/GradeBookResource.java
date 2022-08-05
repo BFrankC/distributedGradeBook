@@ -6,7 +6,6 @@ import com.comp655.distributedgradebook.GradebookMap;
 import com.comp655.distributedgradebook.IdName;
 import com.comp655.distributedgradebook.Server;
 import com.comp655.distributedgradebook.Student;
-import com.comp655.distributedgradebook.StudentList;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.DELETE;
@@ -180,8 +179,15 @@ public class GradeBookResource {
     @Path("{id}")   
     public Response deleteGradebookByID(@PathParam("id") String id) {
         Gradebook removed = gradebookMap.remove(UUID.fromString(id));
+        String type = "primary";
+        if (removed == null ) {
+            // did not find in primary, look in secodary
+            removed = secGradebookRes.getLocalSecondaryGradebooks().remove(UUID.fromString(id));
+            type = "secondary";
+        }
         if (removed != null) {
             // found and deleted locally, try deleting secondary if it exists
+            // if deleted book was secondary the secondaryUrl will be null
             if (removed.getSecondaryUrl() != null) {
                 Client c = ClientBuilder.newClient();
                 Response rsp;
@@ -191,19 +197,8 @@ public class GradeBookResource {
                 // but that is probably outside the scope of this project
             }
             return Response
-                    .ok("Deleted gradebook " + removed.getTitle())
+                    .ok("Deleted " + type + " gradebook " + removed.getTitle())
                     .build();
-        } else {
-            // id wasn't found local, try remote
-            URL remoteLocation = searchLocalAndRemote(UUID.fromString(id));
-            if (remoteLocation != null) {
-                // id was found remotely
-                Client c = ClientBuilder.newClient();
-                Response rsp;
-                // call delete, if it exists remote's delete will delete gradebook's secondary recursively
-                rsp = c.target(remoteLocation.toString() + "/gradebook/" + id).request().delete();
-                return rsp;
-            }
         }
         return Response
                 .status(Status.NOT_FOUND)
@@ -244,7 +239,7 @@ public class GradeBookResource {
         
         // happy path
         Gradebook bookToSend = bookToFind;
-        JAXBContext c = JAXBContext.newInstance( Gradebook.class, StudentList.class, Student.class);
+        JAXBContext c = JAXBContext.newInstance( Gradebook.class, Student.class);
         Marshaller m = c.createMarshaller();
         m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
         StreamingOutput out = (OutputStream os) -> {
@@ -331,7 +326,7 @@ public class GradeBookResource {
             if (remoteGradebook != null) {
                 Client c = ClientBuilder.newClient();
                 Response rsp;
-                rsp = c.target(remoteGradebook.toString() + "/gradebook/" + id + "/student/" + name).request().delete();
+                rsp = c.target(remoteGradebook.toString() + "/secondary/" + id + "/student/" + name).request().delete();
                 // assume this was successful
                 // TODO add error checking if rsp.getStatus != 200
             }
