@@ -107,11 +107,59 @@ public class GradeBookResource {
         return url;
     }
     
+    /*
+    * allows remote instance to check if proposed new gradebook name is already
+    * in use on this server
+    *
+    * only check primaries because caller should check all servers in network.
+    *
+    * Returns status = CONFLICT if name is in use, or
+    *         status = NOT_FOUND if name is not in use
+    */
+    @GET
+    @Path("{name}")
+    public Response doesGradebookNameExist(@PathParam("name") String name) {
+        for (Gradebook gb : gradebookMap.values()) {
+            if (gb.getTitle().equals(name)) {
+                return Response
+                        .status(Status.CONFLICT)
+                        .build();
+            }
+        }
+        return Response
+                .status(Status.NOT_FOUND)
+                .build();
+    }
+    
     // !!! any changes to this method MUST be copy/pasted to the @POST version: postCreatePrimaryGradebook
     // (or refactor them both to call one common private function, if you want :)... )
     @PUT
     @Path("{name}")   
     public Response putCreatePrimaryGradebook(@PathParam("name") String name) throws JAXBException {
+        // prohibit duplicate gradebook titles systemwide
+        // check local primary books
+        for (Gradebook gb : gradebookMap.values()) {
+            if (gb.getTitle().equals(name)) {
+                return Response
+                        .status(Status.CONFLICT)
+                        .build();
+            }
+        }
+        // check remote primary books
+        for (Server s : networkContext.getPeersInNetwork()) {
+            // skip local search via network, local is already searched
+            if (s.getUrl().equals(networkContext.getLocalServer().getUrl())) {
+                continue;
+            }
+            Client c = ClientBuilder.newClient();
+            Response rsp = c.target(s.getUrl() + "/gradebook/" + name).request().get();
+            if (rsp.getStatus() == Status.CONFLICT.ordinal()) {
+                return Response
+                        .status(Status.CONFLICT)
+                        .build();
+            }
+        }
+        // name is not in use...create new book
         Gradebook newBook = new Gradebook(name);
         if (!gradebookMap.containsKey(newBook.getID())) {
             // didn't find that UUID locally
