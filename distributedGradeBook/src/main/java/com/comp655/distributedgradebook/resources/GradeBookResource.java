@@ -194,6 +194,30 @@ public class GradeBookResource {
     @POST
     @Path("{name}")   
     public Response postCreatePrimaryGradebook(@PathParam("name") String name) throws JAXBException {
+        // prohibit duplicate gradebook titles systemwide
+        // check local primary books
+        for (Gradebook gb : gradebookMap.values()) {
+            if (gb.getTitle().equals(name)) {
+                return Response
+                        .status(Status.CONFLICT)
+                        .build();
+            }
+        }
+        // check remote primary books
+        for (Server s : networkContext.getPeersInNetwork()) {
+            // skip local search via network, local is already searched
+            if (s.getUrl().equals(networkContext.getLocalServer().getUrl())) {
+                continue;
+            }
+            Client c = ClientBuilder.newClient();
+            Response rsp = c.target(s.getUrl() + "/gradebook/" + name).request().get();
+            if (rsp.getStatus() == Status.CONFLICT.ordinal()) {
+                return Response
+                        .status(Status.CONFLICT)
+                        .build();
+            }
+        }
+        // name is not in use...create new book
         Gradebook newBook = new Gradebook(name);
         if (!gradebookMap.containsKey(newBook.getID())) {
             // didn't find that UUID locally
@@ -434,7 +458,30 @@ public class GradeBookResource {
                                              @PathParam("name") String name,
                                              @PathParam("grade") String grade
                                         ) {
-        // TODO just copy addStudentToGradebook when that one is done
+        if (!this.gradebookMap.containsKey(UUID.fromString(id))) {
+            return Response
+                    .status(Status.NOT_FOUND)
+                    .build();
+        }
+        if (!isValidGrade(grade)) {
+            return Response
+                    .status(Status.BAD_REQUEST)
+                    .build();
+        }
+        Gradebook bookToUpdate = this.gradebookMap.get(UUID.fromString(id));
+        // update local primary copy
+        bookToUpdate.addOrUpdateStudent(name, grade);
+        //update remote secondary copy if such exists
+        if (bookToUpdate.getSecondaryUrl() != null) {
+            Client cli = ClientBuilder.newClient();
+            String targetAddress = bookToUpdate.getSecondaryUrl().toString() + "/secondary/" + id + "/update/" + name + "/grade/" + grade;
+            cli.target(targetAddress)
+                .request()
+                .put(Entity.text(name+grade));
+        }
+
+        // updates not permitted on secondary copies
+        
         return Response
                 .ok()
                 .build();

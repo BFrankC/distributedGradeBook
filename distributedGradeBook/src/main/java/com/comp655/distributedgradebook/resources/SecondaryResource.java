@@ -142,11 +142,79 @@ public class SecondaryResource {
     
     @POST
     @Path("{id}")   
-    public Response postCreateSecondaryGradebook(@PathParam("id") String id) {
-        //  TODO copy/paste other method when it is working/done
-        return Response
-                .status(Response.Status.NOT_IMPLEMENTED)
+    public Response postCreateSecondaryGradebook(@PathParam("id") String id) throws JAXBException {
+        GradebookMap<UUID, Gradebook> localBooks = this.getLocalPrimaryGradebooks();
+        if (localBooks.containsKey(UUID.fromString(id))) {
+            // id found locally:
+            if ( localBooks.get(UUID.fromString(id)).getSecondaryUrl() != null ) {
+                // max of one secondary already exists
+                return Response
+                        .status(Response.Status.CONFLICT)
+                        .build();
+            }
+            // create remote copy of local Gradebook
+            Gradebook bookToCopy = localBooks.get(UUID.fromString(id));
+            // choose a destination
+            ArrayList<Server> networkPeerList = networkContext.getPeersInNetwork();
+            Random random = new Random();
+            Server randomDestination = networkPeerList.get(random.nextInt(networkPeerList.size()));
+            if (randomDestination.getId().equals(networkContext.getLocalServer().getId())) {
+                // this instance is the only server in the network
+                // sysadmin forgot to setup networking
+                return Response
+                        .status(Response.Status.PRECONDITION_REQUIRED)
+                        .build();
+            }
+            if (randomDestination.getUrl().equals(networkContext.getLocalServer().getUrl())) {
+                // randomly chose self, choose the next one
+                randomDestination = networkPeerList.get( (networkPeerList.indexOf(randomDestination) + 1) % networkPeerList.size());
+            }
+            String remoteAddress = randomDestination
+                    .getUrl()
+                    .toString() + "/secondary/" + id;
+            // marshal bookToCopy and send to a REST resource
+            // that can unmarshal and add it to the destination secondary map
+            // this will preserve the name and UUID
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
+            Marshaller m = c.createMarshaller();
+            m.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, Boolean.TRUE);
+            StreamingOutput out = (OutputStream os) -> {
+                try {
+                    m.marshal(bookToCopy, os);
+                } catch (JAXBException ex) {
+                    Logger.getLogger(SecondaryResource.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            };
+            // new client, request, send to /remoteAddress/secondary/id
+            // then put remoteAddress in bookToCopy.setSecondaryUrl()
+            Client cli = ClientBuilder.newClient();
+            Response rsp = cli.target(remoteAddress).request().put(Entity.xml(out));
+            bookToCopy.setSecondaryUrl(randomDestination.getUrl());
+            return Response
+                .ok()
                 .build();
+        } else {
+            // id not found locally, find remotely and store locally here
+            URL remoteLocation = priGradebookRes.searchLocalAndRemote(UUID.fromString(id));
+            if (remoteLocation == null ) {
+                return Response
+                        .status(Response.Status.NOT_FOUND)
+                        .build();
+            }
+            Client cli = ClientBuilder.newClient();
+            Response rsp = cli.target(remoteLocation + "/gradebook/" + id + "/student").request().get();
+            // jaxb unmarshal
+            JAXBContext c = JAXBContext.newInstance(Gradebook.class);
+            Unmarshaller u = c.createUnmarshaller();
+            StringBuffer xmlString = new StringBuffer(rsp.readEntity(String.class));
+            Gradebook importedGradebook = (Gradebook) u.unmarshal(new StreamSource(new StringReader(xmlString.toString())));
+            importedGradebook.setID(UUID.fromString(id));
+            this.secondaryGradebookMap.put(importedGradebook.getID(), importedGradebook);
+            
+            return Response
+                    .ok(xmlString.toString())
+                    .build();
+        }
     }
     
     /*
